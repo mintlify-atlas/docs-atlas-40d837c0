@@ -1,0 +1,116 @@
+---
+title: 'Product, variant, and cart item data model reference'
+description: 'Full field reference for the Product, ProductVariant, and CartItem entities in Virtual Catalog, including discount pricing logic and computed cart getters.'
+---
+
+Every item you sell in Virtual Catalog is modelled as a **Product** that carries one or more **ProductVariants**. A variant represents a distinct colour or style of the product, and each variant holds its own price, stock level, and list of available sizes. This three-level hierarchy — product → variant → size — gives you fine-grained control over inventory and pricing without duplicating product listings.
+
+## Data model
+
+<AccordionGroup>
+  <Accordion title="Product fields">
+
+  The `Product` entity holds the top-level information that is shared across all variants.
+
+  | Field        | Type                   | Required | Description                                                                                  |
+  |--------------|------------------------|----------|----------------------------------------------------------------------------------------------|
+  | `id`         | `String`               | Yes      | Unique identifier assigned by Firestore when the product is created.                         |
+  | `businessId` | `String`               | Yes      | The slug of the business that owns this product.                                             |
+  | `name`       | `String`               | Yes      | Display name shown on the catalog grid and product detail page.                              |
+  | `description`| `String`               | Yes      | Long-form description rendered on the product detail page.                                   |
+  | `category`   | `String`               | Yes      | Category label used for filtering in the catalog. Drives the category filter options.        |
+  | `sku`        | `String?`              | No       | Optional top-level stock-keeping unit for your own reference.                                |
+  | `isAvailable`| `bool`                 | No       | Controls whether the product appears in the customer-facing catalog. Defaults to `true`.     |
+  | `salesCount` | `int`                  | No       | Cumulative number of times this product has been sold. Used for "best selling" sort. Defaults to `0`. |
+  | `imageUrl`   | `List<String>`         | Yes      | Ordered list of image URLs (hosted on Cloudinary). The first image is used as the thumbnail. |
+  | `variants`   | `List<ProductVariant>` | Yes      | One or more variants. At least one variant is required to save a product.                   |
+  | `createdAt`  | `DateTime`             | Yes      | Timestamp set when the product is first created.                                             |
+  | `updatedAt`  | `DateTime`             | Yes      | Timestamp updated every time the product is saved.                                           |
+
+  </Accordion>
+
+  <Accordion title="ProductVariant fields">
+
+  Each `ProductVariant` describes a single colour or style option of the parent product.
+
+  | Field           | Type       | Required | Description                                                                                         |
+  |-----------------|------------|----------|-----------------------------------------------------------------------------------------------------|
+  | `name`          | `String`   | Yes      | Variant name shown to customers (e.g. "Rojo", "Navy Blue").                                         |
+  | `color`         | `int?`     | No       | ARGB integer representation of the variant colour, used to render a colour swatch in the UI.        |
+  | `sizes`         | `List<String>` | Yes  | Available sizes for this variant (e.g. `["S", "M", "L", "XL"]`). Must contain at least one entry. |
+  | `price`         | `double`   | Yes      | Original list price before any discount.                                                            |
+  | `discountPrice` | `double?`  | No       | Sale price. When set, this is the amount the customer pays. Must be lower than `price`.             |
+  | `stock`         | `int`      | Yes      | Units in stock. The cart enforces this limit — customers cannot add more than the available stock.  |
+  | `sku`           | `String?`  | No       | Optional variant-level SKU for your own reference.                                                  |
+
+  </Accordion>
+
+  <Accordion title="CartItem pricing logic">
+
+  When a customer adds a variant to the cart, a `CartItem` is created that ties together the product, the chosen variant, and the selected size.
+
+  | Computed property    | Formula                                            | Description                                                |
+  |----------------------|----------------------------------------------------|------------------------------------------------------------|
+  | `unitPrice`          | `discountPrice ?? price`                           | The price the customer actually pays per unit.             |
+  | `originalUnitPrice`  | `price`                                            | The original list price, used to display crossed-out pricing. |
+  | `subTotal`           | `unitPrice × quantity`                             | Line total at the discounted price.                        |
+  | `originalSubTotal`   | `originalUnitPrice × quantity`                     | Line total at the original price.                          |
+  | `hasDiscount`        | `discountPrice != null`                            | `true` when a discount price is set.                       |
+  | `savings`            | `originalSubTotal − subTotal`                      | Amount saved on this line item.                            |
+
+  The cart aggregates `savings` across all items and shows a total savings callout in the cart drawer whenever `hasSavings` is `true`.
+
+  </Accordion>
+</AccordionGroup>
+
+## Dart entity reference
+
+The entities below are the canonical source of truth used throughout the app.
+
+```dart
+// lib/domain/entities/product.dart
+class Product {
+  final String id;
+  final String businessId;
+  final String? sku;
+  final String name;
+  final String description;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String category;
+  final bool isAvailable;       // defaults to true
+  final int salesCount;         // defaults to 0
+  final List<String> imageUrl;
+  final List<ProductVariant> variants;
+}
+```
+
+```dart
+// lib/domain/entities/product_variant.dart
+class ProductVariant {
+  final String? sku;
+  final String name;
+  final int? color;             // ARGB integer
+  final int stock;
+  final List<String> sizes;
+  final double price;
+  final double? discountPrice;  // null = no discount
+}
+```
+
+```dart
+// lib/domain/entities/cart_item.dart
+class CartItem {
+  Product product;
+  ProductVariant variant;
+  String size;
+  int quantity;
+
+  double get unitPrice        => variant.discountPrice ?? variant.price;
+  double get originalUnitPrice => variant.price;
+  double get subTotal         => unitPrice * quantity;
+  double get originalSubTotal => originalUnitPrice * quantity;
+  bool   get hasDiscount      => variant.discountPrice != null;
+  double get savings          => originalSubTotal - subTotal;
+}
+```

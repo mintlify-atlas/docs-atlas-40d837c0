@@ -1,0 +1,104 @@
+---
+title: "Customize your Virtual Catalog storefront color theme"
+description: "Set themeColorHex on your Business document to seed Material 3 across your storefront. ThemeConfig derives all surface and accent colors from one hex value."
+---
+
+Virtual Catalog generates its entire color scheme from a single hex value stored on your `Business` entity. When the app starts, it reads `business.themeColorHex`, converts it to a Flutter `Color`, and passes it to `ThemeConfig` as the Material 3 `colorSchemeSeed`. Material 3's color system then derives every surface, container, and on-color from that one seed — so changing one field in your business settings repaints the whole storefront.
+
+## How theming works
+
+The `Business` entity (the root record that describes your store) exposes an optional `themeColorHex` field:
+
+```dart lib/domain/entities/business.dart
+class Business {
+  // ...
+  final String? themeColorHex;
+  // ...
+}
+```
+
+In `main.dart`, a `Consumer<BusinessProvider>` watches for changes to the loaded business and rebuilds `MaterialApp.router` with a fresh theme whenever the value changes:
+
+```dart lib/main.dart
+child: Consumer<BusinessProvider>(
+  builder: (context, businessProvider, child) {
+    final business = businessProvider.business;
+    final customColor = ThemeConfig.hexToColor(business?.themeColorHex);
+
+    return MaterialApp.router(
+      theme: ThemeConfig(
+        selectedColor: 0,
+        customColor: customColor,
+      ).getTheme(),
+      routerConfig: appRouter,
+    );
+  },
+),
+```
+
+## ThemeConfig
+
+`ThemeConfig` lives in `lib/config/themes/theme_config.dart`. It accepts a `customColor` and falls back to a built-in palette if none is provided:
+
+```dart lib/config/themes/theme_config.dart
+List<Color> colors = [Colors.blueAccent, Colors.redAccent, Colors.greenAccent];
+
+class ThemeConfig {
+  final int selectedColor;
+  final Color? customColor;
+
+  ThemeConfig({required this.selectedColor, this.customColor});
+
+  ThemeData getTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      colorSchemeSeed: customColor ?? colors[selectedColor],
+    );
+  }
+
+  static Color? hexToColor(String? hexString) {
+    if (hexString == null || hexString.isEmpty) return null;
+    final buffer = StringBuffer();
+    if (hexString.length == 6 || hexString.length == 7) {
+      buffer.write('ff');
+    }
+    buffer.write(hexString.replaceFirst('#', ''));
+    try {
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (e) {
+      return null;
+    }
+  }
+}
+```
+
+`hexToColor()` accepts a hex string with or without a leading `#` (e.g., `"#3B82F6"` or `"3B82F6"`). If the value is null, empty, or cannot be parsed, the method returns `null` and `ThemeConfig` falls back to the first color in the built-in list (`Colors.blueAccent`).
+
+## Set your theme color
+
+Update the `themeColorHex` field on your Business document in Firestore directly, or through the admin settings panel when it becomes available:
+
+1. Open the [Firebase console](https://console.firebase.google.com) and navigate to **Firestore Database**.
+2. Find your business document (keyed by your store's `slug`).
+3. Set the `themeColorHex` field to a 6-digit hex color, for example `3B82F6`.
+4. Save the document. The app picks up the change the next time `BusinessProvider` loads the business record.
+
+<Tip>
+Choose a color that meets WCAG AA contrast requirements against both white and dark backgrounds. Material 3 generates light and dark variants automatically, but the seed color itself must be distinct enough from neutral surfaces for text and icons to remain legible. Tools like [Accessible Colors](https://accessible-colors.com) or the [Material Theme Builder](https://m3.material.io/theme-builder) let you preview the full generated palette before you commit to a value.
+</Tip>
+
+## Fallback colors
+
+If `themeColorHex` is not set on the Business record, `ThemeConfig` falls back to index `0` of the built-in color list:
+
+| Index | Color |
+| --- | --- |
+| 0 (default) | `Colors.blueAccent` |
+| 1 | `Colors.redAccent` |
+| 2 | `Colors.greenAccent` |
+
+These built-in presets are not currently selectable from the admin panel; they serve as safe fallbacks while `themeColorHex` is empty.
+
+## Roadmap
+
+Full dynamic theming — including font selection and dark mode toggle — directly from the admin panel is on the roadmap. The `FontNames` class already defines the three typefaces used across the app (`EB Garamond` for headings, `Raleway` for subheadings, `Lato` for body text), which will become configurable in a future release.

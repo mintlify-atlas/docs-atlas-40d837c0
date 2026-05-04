@@ -1,81 +1,92 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+title: "Set up and run Virtual Catalog locally from scratch"
+description: "Configure Firebase and Cloudinary, install Flutter dependencies, and run your first Virtual Catalog storefront locally in six straightforward steps."
 ---
 
-## Get started in three steps
+Virtual Catalog runs on Flutter 3.x and Firebase, so before you start you need the Flutter SDK installed on your machine, an active Firebase project, and a Cloudinary account with an upload preset configured. Once those are in place, you can have a working storefront running locally in a single terminal session.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Clone the repository">
+    Clone the Virtual Catalog repository and move into the project directory.
 
-### Step 1: Set up your local environment
+    ```bash
+    git clone https://github.com/Andzzio/virtual-catalog.git
+    cd virtual-catalog
+    ```
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Install Flutter dependencies">
+    Fetch all Dart packages declared in `pubspec.yaml`, including `firebase_core`, `cloud_firestore`, `flutter_dotenv`, `provider`, `go_router`, and the rest of the dependency tree.
 
-### Step 2: Deploy your changes
+    ```bash
+    flutter pub get
+    ```
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Step title="Create the environment file">
+    Virtual Catalog reads credentials at startup from a file named `env` in the project root (no extension). The app loads this file as an asset via `flutter_dotenv`, so the filename must match the asset path declared in `pubspec.yaml`.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    Create the file and add your three credentials:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    CLOUDINARY_CLOUD_NAME=your_cloud_name
+    CLOUDINARY_UPLOAD_PRESET=your_upload_preset
+    API_KEY=your_api_key
+    ```
 
-### Step 3: Go live
+    | Variable | Where to find it |
+    |---|---|
+    | `CLOUDINARY_CLOUD_NAME` | Cloudinary Dashboard → Settings → Account |
+    | `CLOUDINARY_UPLOAD_PRESET` | Cloudinary Dashboard → Settings → Upload → Upload presets |
+    | `API_KEY` | Cloudinary Dashboard → Settings → Access Keys |
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Warning>
+      Never commit the `env` file to version control. Add it to `.gitignore` before your first commit.
+    </Warning>
+  </Step>
 
-## Next steps
+  <Step title="Connect Firebase">
+    Initialize Firebase in the project. The FlutterFire CLI writes platform configuration to `lib/firebase_options.dart`, which `main.dart` imports at startup.
 
-Now that you have your docs running, explore these key features:
+    ```bash
+    firebase login
+    firebase init
+    ```
 
-<CardGroup cols={2}>
+    When prompted, select **Firestore**, **Authentication**, and **Hosting**. The project ID is `catalogo-virtual-app` if you are connecting to the existing Firebase project, or enter your own project ID if you created a new one.
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    ```bash
+    flutterfire configure
+    ```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+    This updates `lib/firebase_options.dart` with the correct app IDs for each platform.
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    <Info>
+      Install the FlutterFire CLI once with `dart pub global activate flutterfire_cli` if you haven't already.
+    </Info>
+  </Step>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+  <Step title="Run the app">
+    Start the development server. Use the `-d chrome` flag to target the web renderer, which is the fastest way to verify the full storefront experience locally.
 
-</CardGroup>
+    ```bash
+    flutter run -d chrome
+    ```
+
+    For mobile targets, connect a device or start an emulator, then run `flutter run` without the `-d` flag to select from available devices.
+  </Step>
+
+  <Step title="Open your storefront">
+    Once the app is running, navigate to your business slug in the browser:
+
+    ```
+    http://localhost:<port>/<businessSlug>
+    ```
+
+    The storefront loads the business record matching that slug from Firestore and renders the catalog with your products, filters, and branding.
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  If you don't have a business record in Firestore yet, create one with a `slug` field matching the URL segment you want to use (for example, `my-store`). The admin panel is accessible at `/<businessSlug>/admin` once Firebase Auth is configured.
 </Note>

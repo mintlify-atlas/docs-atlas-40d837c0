@@ -1,0 +1,86 @@
+---
+title: 'Admin panel: products, banners, and settings guide'
+description: 'Manage your Virtual Catalog storefront: create products with variants, upload banner images, configure payment and delivery methods, and design your home page.'
+---
+
+The admin panel gives you full control over your Virtual Catalog storefront without touching any code. From one interface you can publish new products, run promotions with banner images, configure delivery and payment options, and craft your home page layout with the visual home builder.
+
+<Warning>
+  Your admin credentials are the only thing protecting your storefront data. Use a strong, unique password and never share your login URL or credentials publicly. If you suspect unauthorised access, change your password immediately from your Firebase Authentication console.
+</Warning>
+
+## Logging in
+
+Navigate to `/<slug>/admin/login` to reach the login screen. Enter your owner credentials to authenticate. Once logged in, you are redirected to `/<slug>/admin/dashboard` automatically. Navigating directly to `/<slug>/admin` or `/<slug>/admin/dashboard` without being authenticated redirects you back to the login page.
+
+## Admin panel sections
+
+<CardGroup cols={2}>
+  <Card title="Dashboard" icon="chart-bar">
+    An overview of your storefront's key metrics. See recent orders, sales totals, and product counts at a glance.
+  </Card>
+  <Card title="Products" icon="tag">
+    Browse, create, edit, and delete products. Each product supports multiple variants with individual pricing, stock, sizes, and colour swatches.
+  </Card>
+  <Card title="Banners" icon="image">
+    Upload and manage the hero banner images displayed at the top of your home page. Banners cycle through automatically when more than one is configured.
+  </Card>
+  <Card title="Settings" icon="gear">
+    Update your business name, description, logo, WhatsApp number, theme colour, Izipay credentials, delivery methods, payment methods, and terms and conditions.
+  </Card>
+  <Card title="Home builder" icon="table-cells-large">
+    Design your home page by adding, reordering, and configuring product blocks. Choose a sort criteria and layout for each block to highlight new arrivals, best sellers, or specific products.
+  </Card>
+</CardGroup>
+
+## Managing products
+
+### Product list
+
+Go to **Products** in the left sidebar. You see a table of all your products sorted alphabetically by category. From here you can:
+
+- Tap a product row to edit it.
+- Use the delete action to permanently remove a product.
+- Navigate to **Create product** to add a new one.
+
+### Creating and editing a product
+
+The create/edit screen is split into three sections:
+
+1. **Basic info** — fill in the product name, category, optional top-level SKU, and description.
+2. **Media** — upload one or more product images. Images are stored on Cloudinary. At least one image is required before you can save.
+3. **Variants** — define one or more variants. Each variant requires:
+   - A variant name and optional SKU.
+   - A colour (displayed as a swatch to customers).
+   - An original price and an optional discount price.
+   - A stock quantity.
+   - At least one size (e.g. `S`, `M`, `L`, `XL`).
+
+Hit **Save product** (or **Save changes** when editing) in the top-right toolbar. The app validates the form, uploads any new images to Cloudinary, then writes the product to Firestore. A confirmation snackbar confirms success.
+
+<Note>
+  Every variant must have at least one size selected. Attempting to save a product where any variant has an empty size list will show a validation error and block the save.
+</Note>
+
+### Availability
+
+Products are visible in the customer catalog when `isAvailable` is `true`. To temporarily hide a product without deleting it, toggle the availability flag from the product edit screen.
+
+## Managing banners
+
+Open **Banners** in the sidebar. Upload images to add new banners, drag to reorder them, and delete banners you no longer need. Changes take effect immediately on your live storefront.
+
+## Business settings
+
+Open **Settings** to configure:
+
+| Setting              | Description                                                                                      |
+|----------------------|--------------------------------------------------------------------------------------------------|
+| Name & description   | Your business display name and a short description shown in the storefront header.               |
+| Logo                 | Upload separate logos for desktop and mobile. Toggle `showDesktopLogo` / `showMobileLogo` to control visibility. |
+| WhatsApp number      | The number that receives WhatsApp order messages. Include the country code (e.g. `+51912345678`). |
+| Theme colour         | A hex colour applied to accents throughout the storefront (e.g. buttons, highlights).            |
+| Delivery methods     | Add delivery options with names and prices. Customers choose from these at checkout.             |
+| Payment methods      | Enable WhatsApp ordering and/or Izipay card payments.                                            |
+| Izipay credentials   | Provide your `izipayUsername`, `izipayPassword`, and `izipayPublicKey` to activate card payments. |
+| Terms & conditions   | Paste your terms text. When populated, a link to `/<slug>/terms` appears in the storefront footer. |

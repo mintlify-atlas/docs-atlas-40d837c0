@@ -1,0 +1,389 @@
+---
+title: 'Firestore schema and domain entity field reference'
+description: 'Field reference for all Virtual Catalog entities — Business, Product, ProductVariant, CartItem, Order, BannerItem — with Firestore collection structure.'
+---
+
+Virtual Catalog organizes its data around two top-level Firestore collections — `businesses` and `products` — plus an `orders` collection that is mirrored into a per-business subcollection for efficient admin queries. Every entity in the domain layer is a plain Dart class with no Firebase dependencies; Firestore-specific serialization lives exclusively in the model classes under `lib/data/models/`.
+
+## Multi-tenancy model
+
+Each storefront is identified by its **slug** — a short, URL-safe string chosen at business creation time. The slug serves as the Firestore document ID in the `businesses` collection and as the `businessId` field on every product. This means:
+
+- `businesses/{slug}` — the single document for a storefront's configuration.
+- `products` (root collection) — queried with `where("businessId", isEqualTo: slug)` to scope results to one storefront.
+- `businesses/{slug}/orders` — subcollection for fast admin dashboard queries.
+
+<Info>
+There is no numeric primary key. The slug is both the human-readable URL segment (`/:businessSlug`) and the Firestore document ID.
+</Info>
+
+## Entities
+
+<AccordionGroup>
+
+  <Accordion title="Business">
+
+The root entity for a storefront. One document per slug in the `businesses` collection.
+
+```dart lib/domain/entities/business.dart
+class Business {
+  final String slug;
+  final String ownerId;
+  final String name;
+  final String description;
+  final String logoUrl;
+  final String whatsappNumber;
+  final List<BannerItem> banners;
+  final List<DeliveryMethod> deliveryMethods;
+  final List<PaymentMethod> paymentMethods;
+  final bool showDesktopLogo;
+  final bool showMobileLogo;
+  final String? termsAndConditions;
+  final List<HomeBlock> homeBlocks;
+  final String? izipayUsername;
+  final String? izipayPassword;
+  final String? izipayPublicKey;
+  final String? themeColorHex;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `slug` | `String` | Yes | Firestore document ID; used in all URLs |
+| `ownerId` | `String` | Yes | Firebase Auth UID of the business owner |
+| `name` | `String` | Yes | Display name, also set as the browser page title |
+| `description` | `String` | Yes | Short storefront description |
+| `logoUrl` | `String` | Yes | Cloudinary or public image URL; also set as the favicon |
+| `whatsappNumber` | `String` | Yes | Used for WhatsApp payment and contact links |
+| `banners` | `List<BannerItem>` | Yes | Hero carousel slides |
+| `deliveryMethods` | `List<DeliveryMethod>` | Yes | Available shipping/pickup options |
+| `paymentMethods` | `List<PaymentMethod>` | Yes | Accepted payment types |
+| `showDesktopLogo` | `bool` | No | Defaults to `true` |
+| `showMobileLogo` | `bool` | No | Defaults to `true` |
+| `termsAndConditions` | `String?` | No | Markdown or plain text; the `/:slug/terms` route redirects to home when this is null or empty |
+| `homeBlocks` | `List<HomeBlock>` | No | Ordered list of product blocks on the home page; defaults to `[]` |
+| `izipayUsername` | `String?` | No | Izipay merchant credentials |
+| `izipayPassword` | `String?` | No | Izipay merchant credentials |
+| `izipayPublicKey` | `String?` | No | Izipay public key for client-side tokenization |
+| `themeColorHex` | `String?` | No | Hex string (e.g. `#E53935`) used to seed the Material color scheme |
+
+  </Accordion>
+
+  <Accordion title="Product">
+
+Stored in the root `products` collection. Scoped to a business via `businessId`.
+
+```dart lib/domain/entities/product.dart
+class Product {
+  final String id;
+  final String businessId;
+  final String? sku;
+  final String name;
+  final String description;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String category;
+  final bool isAvailable;
+  final int salesCount;
+  final List<String> imageUrl;
+  final List<ProductVariant> variants;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | `String` | Yes | Auto-generated Firestore document ID |
+| `businessId` | `String` | Yes | Equals the business `slug`; used as the Firestore filter |
+| `sku` | `String?` | No | Optional merchant stock-keeping unit |
+| `name` | `String` | Yes | Product display name |
+| `description` | `String` | Yes | Full product description |
+| `createdAt` | `DateTime` | Yes | Timestamp set on first write |
+| `updatedAt` | `DateTime` | Yes | Timestamp updated on every edit |
+| `category` | `String` | Yes | Free-text category; products are sorted by category in `ProductProvider` |
+| `isAvailable` | `bool` | No | Defaults to `true`; hidden from catalog when `false` |
+| `salesCount` | `int` | No | Defaults to `0`; used for "best selling" sort in `HomeBlock` |
+| `imageUrl` | `List<String>` | Yes | Ordered list of image URLs (Cloudinary recommended) |
+| `variants` | `List<ProductVariant>` | Yes | At least one variant is expected |
+
+  </Accordion>
+
+  <Accordion title="ProductVariant">
+
+Embedded inside each `Product` document as a list — not a separate Firestore collection.
+
+```dart lib/domain/entities/product_variant.dart
+class ProductVariant {
+  final String? sku;
+  final String name;
+  final int? color;
+  final int stock;
+  final List<String> sizes;
+  final double price;
+  final double? discountPrice;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `sku` | `String?` | No | Optional variant-level SKU |
+| `name` | `String` | Yes | Variant label (e.g. "Azul marino", "Talla única") |
+| `color` | `int?` | No | ARGB color integer for color-swatch UI |
+| `stock` | `int` | Yes | Current inventory count; `CartProvider` enforces this as the max quantity |
+| `sizes` | `List<String>` | Yes | Available size labels (e.g. `["S", "M", "L"]`); empty list means no size selection |
+| `price` | `double` | Yes | Regular selling price |
+| `discountPrice` | `double?` | No | Sale price; when set, takes precedence over `price` in cart calculations |
+
+  </Accordion>
+
+  <Accordion title="CartItem">
+
+An in-memory entity — never written to Firestore. Persisted locally per-business using `SharedPreferences` (key: `cart_{slug}`).
+
+```dart lib/domain/entities/cart_item.dart
+class CartItem {
+  Product product;
+  ProductVariant variant;
+  String size;
+  int quantity;
+
+  // Computed getters
+  double get unitPrice        => variant.discountPrice ?? variant.price;
+  double get originalUnitPrice => variant.price;
+  double get subTotal         => unitPrice * quantity;
+  double get originalSubTotal => originalUnitPrice * quantity;
+  bool   get hasDiscount      => variant.discountPrice != null;
+  double get savings          => originalSubTotal - subTotal;
+}
+```
+
+| Field / Getter | Type | Notes |
+|----------------|------|-------|
+| `product` | `Product` | Full product snapshot at time of add-to-cart |
+| `variant` | `ProductVariant` | The selected variant |
+| `size` | `String` | The selected size label |
+| `quantity` | `int` | Mutable; capped at `variant.stock` by `CartProvider` |
+| `unitPrice` | `double` (computed) | `discountPrice` if present, otherwise `price` |
+| `originalUnitPrice` | `double` (computed) | Always `price`, regardless of discounts |
+| `subTotal` | `double` (computed) | `unitPrice × quantity` |
+| `originalSubTotal` | `double` (computed) | `originalUnitPrice × quantity` |
+| `hasDiscount` | `bool` (computed) | `true` when `variant.discountPrice != null` |
+| `savings` | `double` (computed) | `originalSubTotal − subTotal` |
+
+<Tip>
+`CartProvider` supports two checkout modes: `CartMode.buyNow` (single item, bypasses the cart) and `CartMode.buyCart` (all cart items proceed to checkout). Both modes populate `_checkoutItems` before navigating to `/:slug/checkout`.
+</Tip>
+
+  </Accordion>
+
+  <Accordion title="Order">
+
+Written to two Firestore locations on creation: `orders/{orderId}` (global) and `businesses/{businessId}/orders/{orderId}` (scoped subcollection).
+
+```dart lib/domain/entities/order.dart
+class Order {
+  final String? id;
+  final String businessId;
+  // Customer shipping details
+  final String customerName;
+  final String customerLastName;
+  final String customerPhone;
+  final String customerDni;
+  final String? customerCountry;
+  final String customerAddress;
+  final String customerCity;
+  final String customerRegion;
+  final String? customerZip;
+  final String? notes;
+  final String? customerEmail;
+  // Order details
+  final List<CartItem> items;
+  final double total;
+  final String status; // 'pending' | 'paid' | 'failed'
+  final String paymentMethod;
+  final String? deliveryMethod;
+  final DateTime createdAt;
+  // Optional separate billing address
+  final bool isBillingSameAsShipping;
+  final String? billingName;
+  final String? billingLastName;
+  final String? billingCompany;
+  final String? billingCountry;
+  final String? billingAddress;
+  final String? billingReference;
+  final String? billingDistrict;
+  final String? billingRegion;
+  final String? billingZip;
+  final String? billingPhone;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | `String?` | No | Null before creation; assigned by Firestore |
+| `businessId` | `String` | Yes | Business slug |
+| `customerName` | `String` | Yes | |
+| `customerLastName` | `String` | Yes | |
+| `customerPhone` | `String` | Yes | |
+| `customerDni` | `String` | Yes | National identity document number |
+| `customerCountry` | `String?` | No | |
+| `customerAddress` | `String` | Yes | |
+| `customerCity` | `String` | Yes | |
+| `customerRegion` | `String` | Yes | |
+| `customerZip` | `String?` | No | |
+| `notes` | `String?` | No | Customer order notes |
+| `customerEmail` | `String?` | No | Required for Izipay payment links |
+| `items` | `List<CartItem>` | Yes | Snapshot of cart at checkout time |
+| `total` | `double` | Yes | Grand total including delivery |
+| `status` | `String` | Yes | `'pending'`, `'paid'`, or `'failed'` |
+| `paymentMethod` | `String` | Yes | Selected payment method name |
+| `deliveryMethod` | `String?` | No | Selected delivery method name |
+| `createdAt` | `DateTime` | Yes | |
+| `isBillingSameAsShipping` | `bool` | No | Defaults to `true` |
+| `billingName` … `billingPhone` | `String?` | No | Separate billing address fields; only relevant when `isBillingSameAsShipping` is `false` |
+
+<Note>
+Stale pending orders can be purged via `OrderRepository.deleteStalePendingOrders(String businessId, {int daysThreshold})`. This keeps both the root `orders` collection and the business subcollection clean without manual intervention.
+</Note>
+
+  </Accordion>
+
+  <Accordion title="BannerItem">
+
+Embedded in `Business.banners`. Rendered as a hero carousel on the home page.
+
+```dart lib/domain/entities/banner_item.dart
+class BannerItem {
+  final String imageUrl;
+  final String? mobileImageUrl;
+  final String title;
+  final String subtitle;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `imageUrl` | `String` | Yes | Desktop image |
+| `mobileImageUrl` | `String?` | No | Optional mobile-optimized image |
+| `title` | `String` | Yes | Overlay headline |
+| `subtitle` | `String` | Yes | Overlay subheading |
+
+  </Accordion>
+
+  <Accordion title="HomeBlock">
+
+Embedded in `Business.homeBlocks`. Each block defines a product collection section displayed on the home page with a configurable layout and sort order.
+
+```dart lib/domain/entities/home_block.dart
+enum BlockLayout { list, grid, mosaic, featured }
+
+enum BlockSortCriteria {
+  bestSelling, newest, recentlyUpdated, alphabetical,
+  biggestDiscount, premiumFirst, affordableFirst, manual,
+}
+
+class HomeBlock {
+  final String id;
+  final BlockLayout layout;
+  final String title;
+  final String? subtitle;
+  final bool showButton;
+  final String? buttonText;
+  final String? buttonAction;
+  final BlockSortCriteria sortCriteria;
+  final int itemsLimit;
+  final String? specificProductId;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | `String` | Yes | Unique block identifier |
+| `layout` | `BlockLayout` | Yes | `list`, `grid`, `mosaic`, or `featured` |
+| `title` | `String` | Yes | Section heading |
+| `subtitle` | `String?` | No | Section subheading |
+| `showButton` | `bool` | No | Defaults to `false` |
+| `buttonText` | `String?` | No | CTA button label |
+| `buttonAction` | `String?` | No | Navigation target for the CTA button |
+| `sortCriteria` | `BlockSortCriteria` | Yes | Controls how `ProductProvider.getProductsForBlock` orders results |
+| `itemsLimit` | `int` | Yes | Maximum products to display in the block |
+| `specificProductId` | `String?` | No | Used with `BlockSortCriteria.manual` to pin a single product |
+
+  </Accordion>
+
+  <Accordion title="DeliveryMethod">
+
+Embedded in `Business.deliveryMethods`. Presented as options at checkout.
+
+```dart lib/domain/entities/delivery_method.dart
+// DeliveryType enum
+enum DeliveryType {
+  shipping,  // "Envío"
+  pickup,    // "Recojo en tienda"
+  courier,   // "Agencia de envío"
+}
+
+class DeliveryMethod {
+  final String name;
+  final DeliveryType type;
+  final int price;
+  final String? description;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `name` | `String` | Yes | Display name (e.g. "Envío a Lima") |
+| `type` | `DeliveryType` | Yes | `shipping`, `pickup`, or `courier` |
+| `price` | `int` | Yes | Cost in the business's local currency unit |
+| `description` | `String?` | No | Additional details shown at checkout |
+
+  </Accordion>
+
+  <Accordion title="PaymentMethod">
+
+Embedded in `Business.paymentMethods`. Determines which payment options appear at checkout.
+
+```dart lib/domain/entities/payment_method.dart
+// PaymentType enum
+enum PaymentType {
+  whatsapp,      // Order via WhatsApp
+  bankTransfer,  // Manual bank transfer
+  culqi,         // Culqi card gateway
+  yape,          // Yape QR
+  izipay,        // Izipay hosted payment link
+}
+
+class PaymentMethod {
+  final String name;
+  final String? description;
+  final PaymentType type;
+}
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `name` | `String` | Yes | Display name |
+| `description` | `String?` | No | Instructions or account details |
+| `type` | `PaymentType` | Yes | Controls checkout flow (e.g. `izipay` triggers `IzipayProvider`) |
+
+  </Accordion>
+
+</AccordionGroup>
+
+## Firestore collection map
+
+```
+firestore/
+├── businesses/
+│   └── {slug}/                     ← Business document (ID = slug)
+│       └── orders/
+│           └── {orderId}/          ← Order subcollection (mirrored from root)
+├── products/
+│   └── {productId}/                ← businessId field scopes to a slug
+└── orders/
+    └── {orderId}/                  ← Global order collection for real-time status polling
+```
+
+<Warning>
+Products are not stored as a subcollection of `businesses`. They live in the root `products` collection and are filtered by `businessId`. Querying without the `businessId` filter returns products from all businesses.
+</Warning>

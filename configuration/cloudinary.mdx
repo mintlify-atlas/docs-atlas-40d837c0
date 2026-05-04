@@ -1,0 +1,99 @@
+---
+title: "Configure Cloudinary for Virtual Catalog image uploads"
+description: "Create a Cloudinary account, get your Cloud Name and unsigned upload preset, then add the two credentials to your env file so product image uploads work."
+---
+
+Virtual Catalog uses Cloudinary to store and serve all product images. When you or an admin uploads a product photo, the app compresses it to WebP format at 80% quality with a minimum width of 1920 px, then sends it to Cloudinary via the upload API. Cloudinary returns a permanent `secure_url` that the catalog stores in Firestore and serves to customers. You need a Cloudinary account and two configuration values — your Cloud Name and an unsigned upload preset — before image uploads will work.
+
+## How the upload service works
+
+The `CloudinaryService` in `lib/data/services/cloudinary_service.dart` handles all image delivery:
+
+```dart lib/data/services/cloudinary_service.dart
+class CloudinaryService {
+  final String _cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
+  final String _uploadPreset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
+
+  final Dio _dio = Dio();
+
+  Future<Map<String, String>> uploadImage(
+    Uint8List imageBytes,
+    String fileName,
+  ) async {
+    final Uint8List imageBytesCompressed = await _compressImage(imageBytes);
+
+    final formData = FormData.fromMap({
+      "file": MultipartFile.fromBytes(imageBytesCompressed, filename: fileName),
+      "upload_preset": _uploadPreset,
+    });
+    final response = await _dio.post(
+      'https://api.cloudinary.com/v1_1/$_cloudName/image/upload',
+      data: formData,
+    );
+    return {
+      "url": response.data["secure_url"],
+      "publicId": response.data["public_id"],
+    };
+  }
+
+  Future<Uint8List> _compressImage(Uint8List imageBytes) async {
+    final Uint8List imageCompressed =
+        await FlutterImageCompress.compressWithList(
+          imageBytes,
+          minWidth: 1920,
+          quality: 80,
+          format: CompressFormat.webp,
+        );
+
+    return imageCompressed;
+  }
+}
+```
+
+The upload endpoint follows the pattern:
+
+```
+https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload
+```
+
+Both `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_UPLOAD_PRESET` are read from your `env` file at startup via `flutter_dotenv`.
+
+## Set up Cloudinary
+
+<Steps>
+  <Step title="Create a Cloudinary account">
+    Go to [cloudinary.com](https://cloudinary.com) and sign up for a free account. The free tier provides 25 credits per month, which is sufficient for most small to medium catalogs.
+  </Step>
+
+  <Step title="Find your Cloud Name">
+    After signing in, go to the **Dashboard**. Your **Cloud Name** is displayed at the top of the page under your account name. It is a short string like `my-shop-cloud`. Copy it — you will need it for the `CLOUDINARY_CLOUD_NAME` variable.
+  </Step>
+
+  <Step title="Create an unsigned upload preset">
+    Virtual Catalog uploads images directly from the Flutter app without a server-side signature, so you need an **unsigned** preset.
+
+    1. In the Cloudinary dashboard, go to **Settings → Upload**.
+    2. Scroll to **Upload presets** and click **Add upload preset**.
+    3. Set **Signing mode** to **Unsigned**.
+    4. Optionally set a folder (e.g., `products`) to keep uploads organized.
+    5. Click **Save**. Copy the preset name — you will need it for `CLOUDINARY_UPLOAD_PRESET`.
+  </Step>
+
+  <Step title="Add credentials to your env file">
+    Open the `env` file at the project root and add the two Cloudinary variables:
+
+    ```bash env
+    CLOUDINARY_CLOUD_NAME=your-cloud-name
+    CLOUDINARY_UPLOAD_PRESET=your-upload-preset-name
+    ```
+
+    See [Environment variables reference](/configuration/environment) for the full list of variables and the required `pubspec.yaml` asset declaration.
+  </Step>
+</Steps>
+
+## Environment variables
+
+| Variable | Description |
+| --- | --- |
+| `CLOUDINARY_CLOUD_NAME` | The Cloud Name from your Cloudinary dashboard |
+| `CLOUDINARY_UPLOAD_PRESET` | The name of the unsigned upload preset you created |

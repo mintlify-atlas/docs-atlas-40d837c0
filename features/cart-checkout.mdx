@@ -1,0 +1,110 @@
+---
+title: 'Shopping cart and checkout flow in Virtual Catalog'
+description: 'How customers add items to cart, choose delivery and payment, and complete an order via WhatsApp or Izipay — with the full Order entity field reference.'
+---
+
+Virtual Catalog provides a persistent shopping cart that customers can access from any page, and a streamlined checkout that collects delivery details and routes the order through WhatsApp or a card payment gateway. No account is required — customers go from browsing to placing an order in just a few steps.
+
+## Adding items to the cart
+
+Before an item can be added to the cart, the customer must make two selections on the product detail page:
+
+1. **Variant** — choose a colour or style (e.g. "Rojo", "Azul").
+2. **Size** — choose a size from the sizes available on that variant (e.g. "M", "XL").
+
+Only after both are selected does the "Add to cart" button become active. The cart enforces the variant's `stock` value — the customer cannot add more units than are in stock. If the same product + variant + size combination is added again, the quantity increases instead of creating a duplicate line.
+
+The cart is persisted locally (via shared preferences) so items survive page refreshes and navigation within the storefront.
+
+## Cart drawer
+
+The cart drawer slides in from the right side of the screen and is accessible from any page via the cart icon in the app bar. It shows:
+
+- Each cart item with its image, variant name, size, quantity controls, and line subtotal.
+- A savings summary when one or more items have a discount price.
+- A "Proceed to checkout" button that locks the current cart contents and navigates to `/<slug>/checkout`.
+
+Customers can adjust quantities or remove items at any time from the drawer. Reducing a quantity to zero removes the item.
+
+## Checkout flow
+
+<Steps>
+  <Step title="Open checkout">
+    The customer taps "Proceed to checkout" in the cart drawer. The app copies the current cart items into a read-only checkout session. If the checkout session is empty (e.g. the customer navigates directly to `/<slug>/checkout` with no items), they are redirected to the home page automatically.
+  </Step>
+
+  <Step title="Fill in contact and shipping details">
+    The checkout form collects the following required fields:
+
+    | Field               | Description                                              |
+    |---------------------|----------------------------------------------------------|
+    | `customerName`      | Customer's first name.                                   |
+    | `customerLastName`  | Customer's last name.                                    |
+    | `customerPhone`     | Contact phone number.                                    |
+    | `customerDni`       | National identity document number.                       |
+    | `customerAddress`   | Street address for delivery.                             |
+    | `customerCity`      | City.                                                    |
+    | `customerRegion`    | Region or department.                                    |
+
+    Optional fields include `customerEmail`, `customerCountry`, `customerZip`, and `notes`.
+  </Step>
+
+  <Step title="Choose a delivery method">
+    The customer selects from the delivery methods you have configured for your business. Each delivery method has a name and an additional price that is added to the order total. The checkout grand total is:
+
+    ```
+    grandTotal = itemsTotalWithDiscounts + deliveryMethod.price
+    ```
+  </Step>
+
+  <Step title="Choose a payment method">
+    The customer selects a payment method. Two payment flows are supported:
+
+    - **WhatsApp** — the order details are formatted into a message and sent to your configured WhatsApp number. The business owner then confirms the order manually.
+    - **Izipay** — if you have configured your Izipay credentials (`izipayUsername`, `izipayPassword`, `izipayPublicKey`) in the business settings, customers can pay by card directly in the storefront.
+  </Step>
+
+  <Step title="Place the order">
+    The customer submits the form. The order is written to Firestore with a status of `pending`. Depending on the chosen payment method:
+
+    - **WhatsApp flow** — the app opens WhatsApp with a pre-filled message listing every item, sizes, quantities, totals, and the customer's shipping details. The business owner receives the message on their WhatsApp number.
+    - **Izipay flow** — the customer completes card payment in the Izipay iframe. On success the order status is updated to `paid`; on failure it is set to `failed`.
+  </Step>
+</Steps>
+
+## Order entity fields
+
+Every completed checkout produces an `Order` record in Firestore.
+
+| Field                    | Type              | Description                                                                 |
+|--------------------------|-------------------|-----------------------------------------------------------------------------|
+| `id`                     | `String?`         | Firestore document ID assigned on creation.                                 |
+| `businessId`             | `String`          | Slug of the business that received the order.                               |
+| `customerName`           | `String`          | Customer's first name.                                                      |
+| `customerLastName`       | `String`          | Customer's last name.                                                       |
+| `customerPhone`          | `String`          | Contact phone number.                                                       |
+| `customerDni`            | `String`          | National identity document number.                                          |
+| `customerAddress`        | `String`          | Delivery street address.                                                    |
+| `customerCity`           | `String`          | Delivery city.                                                              |
+| `customerRegion`         | `String`          | Delivery region or department.                                              |
+| `customerCountry`        | `String?`         | Delivery country (optional).                                                |
+| `customerZip`            | `String?`         | Postal code (optional).                                                     |
+| `customerEmail`          | `String?`         | Email address (optional).                                                   |
+| `notes`                  | `String?`         | Any additional notes from the customer (optional).                          |
+| `items`                  | `List<CartItem>`  | Snapshot of the cart items at the time of purchase.                         |
+| `total`                  | `double`          | Grand total including the delivery method price.                            |
+| `status`                 | `String`          | Order status: `pending`, `paid`, or `failed`.                               |
+| `paymentMethod`          | `String`          | Payment method chosen by the customer.                                      |
+| `deliveryMethod`         | `String?`         | Delivery method chosen by the customer (optional).                          |
+| `createdAt`              | `DateTime`        | Timestamp when the order was placed.                                        |
+| `isBillingSameAsShipping`| `bool`            | Whether billing address matches the shipping address. Defaults to `true`.   |
+| `billingName`            | `String?`         | Billing first name (when different from shipping).                          |
+| `billingLastName`        | `String?`         | Billing last name.                                                          |
+| `billingCompany`         | `String?`         | Billing company name.                                                       |
+| `billingAddress`         | `String?`         | Billing street address.                                                     |
+| `billingDistrict`        | `String?`         | Billing district.                                                           |
+| `billingRegion`          | `String?`         | Billing region.                                                             |
+| `billingCountry`         | `String?`         | Billing country.                                                            |
+| `billingZip`             | `String?`         | Billing postal code.                                                        |
+| `billingReference`       | `String?`         | Additional billing reference.                                               |
+| `billingPhone`           | `String?`         | Billing contact phone.                                                      |

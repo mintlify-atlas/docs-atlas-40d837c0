@@ -1,0 +1,89 @@
+---
+title: "Connect Virtual Catalog to a Firebase project setup"
+description: "Enable Firestore, Auth, and Hosting in Firebase, register your apps, then run FlutterFire configure to generate the firebase_options.dart credentials file."
+---
+
+Virtual Catalog runs on three Firebase services: **Cloud Firestore** stores your products, business settings, and orders in real time; **Firebase Authentication** controls admin access so only you and your team can edit the catalog; and **Firebase Hosting** serves the compiled Flutter web build to your customers. You need all three active before the app will start.
+
+## Required Firebase services
+
+| Service | Purpose |
+| --- | --- |
+| Cloud Firestore | Product catalog, business config, orders |
+| Firebase Authentication | Admin sign-in (email/password) |
+| Firebase Hosting | Serving the Flutter web build |
+
+## Set up your Firebase project
+
+<Steps>
+  <Step title="Create a Firebase project">
+    Go to the [Firebase console](https://console.firebase.google.com) and click **Add project**. Give it a name — for example, `my-virtual-catalog` — and follow the prompts to finish creation. You do not need Google Analytics for basic operation.
+  </Step>
+
+  <Step title="Enable Cloud Firestore">
+    In the Firebase console sidebar, go to **Build → Firestore Database** and click **Create database**. Choose **Start in production mode** so that no data is publicly readable by default, then select the region closest to your customers.
+  </Step>
+
+  <Step title="Enable Firebase Authentication">
+    Go to **Build → Authentication** and click **Get started**. Under **Sign-in method**, enable the **Email/Password** provider. This is what protects your admin panel.
+  </Step>
+
+  <Step title="Enable Firebase Hosting">
+    Go to **Build → Hosting** and click **Get started**. Follow the on-screen steps to initialize the hosting site. The `firebase.json` in the project already contains the correct rewrite rules and cache-control headers for the Flutter web build — you do not need to change them.
+
+    ```json firebase.json (hosting section)
+    {
+      "hosting": {
+        "public": "build/web",
+        "rewrites": [
+          {
+            "source": "**",
+            "destination": "/index.html"
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Register your web app">
+    In **Project settings → General**, scroll to **Your apps** and click the **Web** icon (`</>`). Give the app a nickname and register it. Firebase will display your app's configuration object — copy it, because you will need it in the next step.
+  </Step>
+
+  <Step title="Register your mobile apps (optional)">
+    If you plan to distribute the app on iOS or Android, register each platform under **Your apps** as well. Download the `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) files and place them in the locations the FlutterFire CLI expects.
+  </Step>
+
+  <Step title="Run FlutterFire configure">
+    Install the FlutterFire CLI and run it from the project root. This writes `lib/config/firebase/firebase_options.dart` with the credentials for each registered platform.
+
+    ```bash
+    dart pub global activate flutterfire_cli
+    flutterfire configure --project=YOUR_PROJECT_ID
+    ```
+
+    Replace `YOUR_PROJECT_ID` with the project ID you chose in step 1. The generated file is imported by `main.dart` and passed to `Firebase.initializeApp()`.
+  </Step>
+
+  <Step title="Update .firebaserc">
+    Open `.firebaserc` at the project root and set the `default` project to your project ID:
+
+    ```json .firebaserc
+    {
+      "projects": {
+        "default": "YOUR_PROJECT_ID"
+      }
+    }
+    ```
+
+    This tells the Firebase CLI which project to deploy to when you run `firebase deploy`.
+  </Step>
+</Steps>
+
+## Credentials reference
+
+After running `flutterfire configure`, the file `lib/config/firebase/firebase_options.dart` is generated automatically and contains all platform-specific credentials. You do not need to manage these manually — the CLI handles it. Commit the generated file to version control alongside the rest of the app code.
+
+<Note>
+Firestore security rules are critical. The default production-mode rules block all reads and writes. You must write rules that allow authenticated admins to read and write products, and allow unauthenticated users to read catalog data. Shipping with overly permissive rules (e.g., `allow read, write: if true`) exposes your business data to the public internet. Review the [Firestore security rules documentation](https://firebase.google.com/docs/firestore/security/get-started) before going live.
+</Note>

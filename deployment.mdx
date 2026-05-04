@@ -1,0 +1,132 @@
+---
+title: "Deploy Virtual Catalog to Firebase, iOS, and Android"
+description: "Build Virtual Catalog for production and deploy to Firebase Hosting for web, or generate native iOS and Android release binaries for app store distribution."
+---
+
+Virtual Catalog compiles to a single web build that Firebase Hosting serves as a single-page application, with all routes rewritten to `index.html` so that Go Router handles navigation on the client. The same Flutter codebase also produces native iOS and Android binaries. This page walks you through each deployment target.
+
+<Warning>
+  Flutter web builds do **not** embed your `env` file contents into compiled JavaScript automatically. The `env` file is bundled as a static asset and loaded at runtime by `flutter_dotenv`. Make sure the `env` file is listed under `assets` in `pubspec.yaml` and is present in the build output before deploying — never inject credentials as build-time flags in a public repository.
+</Warning>
+
+<Tabs>
+  <Tab title="Web">
+    <Steps>
+      <Step title="Build for web">
+        Compile the Flutter app to optimized JavaScript and static assets. The output lands in `build/web`, which is the public directory Firebase Hosting is configured to serve.
+
+        ```bash
+        flutter build web --release
+        ```
+
+        The build produces `build/web/index.html`, `build/web/flutter_bootstrap.js`, `build/web/flutter_service_worker.js`, and hashed asset bundles. Confirm the `env` file is present inside `build/web/assets/` before deploying.
+      </Step>
+
+      <Step title="Review firebase.json hosting configuration">
+        The `firebase.json` at the project root already contains the correct hosting configuration. Key settings:
+
+        ```json
+        {
+          "hosting": {
+            "public": "build/web",
+            "ignore": [
+              "firebase.json",
+              "**/node_modules/**"
+            ],
+            "rewrites": [
+              {
+                "source": "**",
+                "destination": "/index.html"
+              }
+            ]
+          }
+        }
+        ```
+
+        The catch-all rewrite ensures that deep links like `/<businessSlug>/product/<id>` resolve correctly — Firebase returns `index.html` and Go Router takes over on the client.
+
+        <Tip>
+          The existing `firebase.json` also sets `Cross-Origin-Embedder-Policy` and `Cross-Origin-Opener-Policy` headers required by certain Flutter web APIs. Do not remove these headers.
+        </Tip>
+      </Step>
+
+      <Step title="Deploy to Firebase Hosting">
+        Deploy the contents of `build/web` to Firebase Hosting under the `catalogo-virtual-app` project.
+
+        ```bash
+        firebase deploy --only hosting
+        ```
+
+        Firebase CLI prints the live URL once the upload completes. Your storefront is immediately available at the Firebase Hosting domain (e.g., `https://catalogo-virtual-app.web.app`).
+
+        To deploy Firestore rules, Auth config, and Cloud Functions at the same time:
+
+        ```bash
+        firebase deploy
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="iOS">
+    <Steps>
+      <Step title="Build the iOS archive">
+        Build a release IPA from the project root. You need Xcode installed and an Apple Developer account with a provisioning profile configured.
+
+        ```bash
+        flutter build ios --release
+        ```
+
+        Open the generated Xcode workspace to set your bundle identifier, signing team, and provisioning profile before archiving.
+
+        ```bash
+        open ios/Runner.xcworkspace
+        ```
+      </Step>
+
+      <Step title="Archive and distribute">
+        In Xcode, select **Product → Archive**, then use the Organizer to distribute through TestFlight or submit directly to the App Store. Alternatively, use `flutter build ipa` to produce a distributable `.ipa` file for ad-hoc distribution.
+
+        ```bash
+        flutter build ipa
+        ```
+
+        The output is written to `build/ios/ipa/`.
+
+        <Info>
+          The `env` file is bundled as a Flutter asset and included in the iOS build automatically via the asset pipeline. No additional configuration is needed for environment variables on iOS.
+        </Info>
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Android">
+    <Steps>
+      <Step title="Build the release APK or App Bundle">
+        For direct distribution, build a signed APK. For the Google Play Store, build an Android App Bundle (`.aab`), which is smaller and required for new Play Store submissions.
+
+        ```bash
+        # App Bundle (Play Store)
+        flutter build appbundle --release
+
+        # APK (direct distribution)
+        flutter build apk --release
+        ```
+
+        Output paths:
+        - App Bundle: `build/app/outputs/bundle/release/app-release.aab`
+        - APK: `build/app/outputs/flutter-apk/app-release.apk`
+      </Step>
+
+      <Step title="Sign and distribute">
+        Configure a signing key in `android/app/build.gradle` using a `key.properties` file before running the release build. See the [Flutter Android deployment guide](https://docs.flutter.dev/deployment/android) for the complete signing setup.
+
+        Upload the `.aab` to the Google Play Console or distribute the `.apk` directly to testers.
+
+        <Info>
+          The `env` file is bundled as a Flutter asset and included in the Android build automatically. No additional configuration is needed for environment variables on Android.
+        </Info>
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>

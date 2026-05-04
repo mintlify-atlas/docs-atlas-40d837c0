@@ -1,0 +1,68 @@
+---
+title: "Virtual Catalog env file and variable reference guide"
+description: "Complete reference for the env file that flutter_dotenv reads at startup: Cloudinary Cloud Name, upload preset, API key, example file, and gitignore setup."
+---
+
+Virtual Catalog uses [`flutter_dotenv`](https://pub.dev/packages/flutter_dotenv) to load runtime configuration from a plain-text file named `env` at the project root. This file is read in `main()` before Firebase or Cloudinary are initialized:
+
+```dart lib/main.dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: "env");
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // ...
+}
+```
+
+Because the `env` file is treated as a Flutter asset, it must be declared in `pubspec.yaml` so it is bundled into the app build.
+
+## pubspec.yaml asset declaration
+
+```yaml pubspec.yaml
+flutter:
+  assets:
+    - env
+    - assets/images/
+```
+
+The `env` entry must appear exactly as shown — a filename with no leading path — because the file lives at the project root.
+
+## Variables reference
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `CLOUDINARY_CLOUD_NAME` | Yes | Your Cloudinary Cloud Name, used to construct the upload endpoint URL. See [Configure Cloudinary](/configuration/cloudinary). |
+| `CLOUDINARY_UPLOAD_PRESET` | Yes | The name of your unsigned Cloudinary upload preset. |
+| `API_KEY` | Yes | API key used for authenticated service calls. |
+
+## Example env file
+
+Create a file named `env` (no extension) at the project root with the following content, replacing the placeholder values with your real credentials:
+
+```bash env
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_UPLOAD_PRESET=your-upload-preset-name
+API_KEY=your-api-key
+```
+
+<Warning>
+Never commit the `env` file to version control. It contains secrets that give anyone who reads it full access to your Cloudinary account and other services. Add it to `.gitignore` immediately:
+
+```bash .gitignore
+# Environment secrets
+env
+```
+
+Use your hosting provider's secret management or a CI/CD secrets store to inject these values in production builds.
+</Warning>
+
+## How variables are accessed in code
+
+Services read variables via `dotenv.env['VARIABLE_NAME']` with a fallback empty string. For example, `CloudinaryService` reads both Cloudinary variables at construction time:
+
+```dart lib/data/services/cloudinary_service.dart
+final String _cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
+final String _uploadPreset = dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
+```
+
+If a variable is missing or the `env` file is not declared as an asset, `dotenv.load()` will throw at startup and the app will not run.

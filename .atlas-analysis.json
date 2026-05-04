@@ -1,0 +1,85 @@
+{
+  "projectType": "saas",
+  "projectName": "Virtual Catalog",
+  "projectDescription": "A Flutter + Firebase digital catalog platform that lets businesses create shareable product storefronts with multi-variant inventory, shopping cart, and WhatsApp-integrated checkout.",
+  "theme": "almond",
+  "primaryColor": "#141414",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "deployment"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/catalog",
+              "features/products",
+              "features/cart-checkout",
+              "features/admin-panel"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/firebase",
+              "configuration/cloudinary",
+              "configuration/environment",
+              "configuration/theming"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/data-model",
+              "architecture/routing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-tenant slug-based storefronts (one deployment, multiple businesses)",
+    "Product variants with colors, sizes, and discount pricing",
+    "Smart shopping cart with persistent state and variant selection",
+    "WhatsApp-integrated one-click checkout flow",
+    "Admin panel with full CRUD for products, banners, and settings",
+    "Cloudinary image upload with automatic WebP compression",
+    "Firebase Auth role-based access control for admin routes",
+    "Izipay payment gateway integration",
+    "Responsive layout for mobile, tablet, and desktop",
+    "Go Router-based navigation with auth guards"
+  ],
+  "publicApiSurface": [
+    "ProductRepository.getProducts(String businessSlug)",
+    "ProductRepository.getProductById(String businessSlug, String productId)",
+    "ProductRepository.addProduct(String businessSlug, Product product)",
+    "ProductRepository.updateProduct(String businessSlug, Product product)",
+    "ProductRepository.deleteProduct(String businessSlug, String productId)",
+    "BusinessRepository.getBusinessBySlug(String slug)",
+    "BusinessRepository.updateBusiness(String slug, Business business)",
+    "CloudinaryService.uploadImage(Uint8List imageBytes, String fileName)",
+    "CloudinaryService.uploadMultipleImages(List<Uint8List> imagesBytes, List<String> fileNames)",
+    "CreateIzipayPaymentUseCase",
+    "Route /:businessSlug — Customer storefront home",
+    "Route /:businessSlug/catalog — Filterable product catalog",
+    "Route /:businessSlug/product/:productId — Product detail",
+    "Route /:businessSlug/checkout — Checkout flow",
+    "Route /:businessSlug/admin/dashboard — Admin dashboard",
+    "Route /:businessSlug/admin/products — Product management",
+    "Route /:businessSlug/admin/banners — Banner management",
+    "Route /:businessSlug/admin/settings — Business settings",
+    "Route /:businessSlug/admin/home-builder — Home layout builder"
+  ]
+}

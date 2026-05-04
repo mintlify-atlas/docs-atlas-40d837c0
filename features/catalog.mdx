@@ -1,0 +1,41 @@
+---
+title: 'How customers browse and filter the product catalog'
+description: 'Learn how the Virtual Catalog storefront catalog works: URL query parameters, real-time filtering, category and size facets, and shareable filtered links.'
+---
+
+The catalog is the heart of every Virtual Catalog storefront. Customers reach it at `/<slug>/catalog` and immediately see your full product range rendered in a responsive grid. On wide screens a persistent filter sidebar sits alongside the grid; on smaller screens filters collapse into the grid header — so every visitor can narrow down results no matter what device they are on.
+
+## Getting to the catalog
+
+Customers reach the catalog from two places:
+
+- **Home page** (`/<slug>`) — product blocks on the home page link directly to the catalog, pre-filtered by category or sort order depending on how you configured each block in the home builder.
+- **App bar** — the catalog icon or "Catálogo" link in the top navigation is always visible, taking the customer to the unfiltered catalog.
+
+## Catalog URL and query parameters
+
+The catalog screen reads its initial state from URL query parameters. This means every filtered view has a shareable, bookmarkable URL.
+
+```
+https://<your-domain>/<slug>/catalog?category=Camisetas&sort=Relevantes&available=true
+```
+
+| Parameter  | Type    | Example value         | Description                                                                                   |
+|------------|---------|-----------------------|-----------------------------------------------------------------------------------------------|
+| `search`   | string  | `nike`                | Full-text search applied against product name and description.                                |
+| `category` | string  | `Camisetas`           | Filters to a single category. Must match a category that exists in your product catalogue.    |
+| `sort`     | string  | `Relevantes`          | Sort order. Accepted values depend on the filter UI options (e.g. `Relevantes`, `Precio`).   |
+| `minPrice` | number  | `50`                  | Lower bound of the price range filter (inclusive).                                            |
+| `maxPrice` | number  | `200`                 | Upper bound of the price range filter (inclusive).                                            |
+| `sizes`    | string  | `S,M,XL`              | Comma-separated list of sizes to include. Products without any of these sizes are hidden.    |
+| `available`| boolean | `true`                | When `true`, only products marked as available (`isAvailable = true`) are shown.              |
+
+All parameters are optional and combinable. Parameters that are absent or empty are ignored — the catalog shows all products by default.
+
+## How filtering works
+
+Filters applied in the sidebar update the URL in real time. The catalog grid re-renders immediately with the narrowed product list — no page reload required. Categories and sizes displayed in the filter panel are derived dynamically from your actual product data, so they stay accurate as you add or remove products.
+
+<Tip>
+  Copy the URL from your browser address bar after applying any combination of filters to create a shareable link. Send it to customers, paste it in marketing messages, or use it as a deep link in banners to drop visitors directly into a pre-filtered view.
+</Tip>
